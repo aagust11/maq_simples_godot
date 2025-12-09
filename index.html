@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulació de Màquines Simples - Física ESO</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js" integrity="sha512-5MPdOZXS6jttuPAHyBs+K6TfGsDzpDHK5vVsQt1zAr72Xd1LSeX776BF3/f6/Dr7guPmyAnbcW2CYwiVdc+GqQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    :root {
+      --bg: radial-gradient(circle at 20% 20%, #1f2937, #0f172a);
+      --panel: rgba(15, 23, 42, 0.8);
+      --accent: #38bdf8;
+      --text: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    #hud {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      background: var(--panel);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 12px;
+      padding: 12px 16px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      max-width: 280px;
+      font-size: 14px;
+      line-height: 1.5;
+      z-index: 10;
+    }
+
+    #hud h1 {
+      font-size: 15px;
+      margin: 0 0 6px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    #hud .hint {
+      color: #cbd5e1;
+      font-size: 13px;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <h1>Màquines simples</h1>
+    <div id="hud-content" class="hint">Arrossega un objecte per veure la seva massa i velocitat.</div>
+  </div>
+
+  <script>
+    const {
+      Engine,
+      Render,
+      Runner,
+      Bodies,
+      Composite,
+      Constraint,
+      Mouse,
+      MouseConstraint,
+      Events,
+      Vector
+    } = Matter;
+
+    const engine = Engine.create();
+    const world = engine.world;
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const render = Render.create({
+      element: document.body,
+      engine,
+      options: {
+        width,
+        height,
+        wireframes: false,
+        background: "transparent",
+      },
+    });
+
+    Render.run(render);
+    const runner = Runner.create();
+    Runner.run(runner, engine);
+
+    // Limits de l'escena
+    const thickness = 40;
+    const floor = Bodies.rectangle(width / 2, height - thickness / 2, width * 1.2, thickness, {
+      isStatic: true,
+      render: { fillStyle: "#334155" },
+    });
+    const ceiling = Bodies.rectangle(width / 2, thickness / 2, width * 1.2, thickness, {
+      isStatic: true,
+      render: { fillStyle: "#1e293b" },
+    });
+    const leftWall = Bodies.rectangle(thickness / 2, height / 2, thickness, height, {
+      isStatic: true,
+      render: { fillStyle: "#1e293b" },
+    });
+    const rightWall = Bodies.rectangle(width - thickness / 2, height / 2, thickness, height, {
+      isStatic: true,
+      render: { fillStyle: "#1e293b" },
+    });
+
+    // Palanca
+    const fulcreX = width * 0.38;
+    const fulcreY = height * 0.72;
+    const fulcre = Bodies.polygon(fulcreX, fulcreY, 3, 30, {
+      isStatic: true,
+      angle: Math.PI,
+      render: { fillStyle: "#d97706" },
+    });
+
+    const palanca = Bodies.rectangle(fulcreX, fulcreY - 28, 260, 20, {
+      density: 0.001,
+      friction: 0.6,
+      restitution: 0.05,
+      render: { fillStyle: "#cbd5e1" },
+      label: "Palanca",
+    });
+
+    const suport = Constraint.create({
+      bodyA: palanca,
+      pointB: { x: fulcreX, y: fulcreY - 2 },
+      length: 0,
+      stiffness: 1,
+      render: { visible: false },
+    });
+
+    // Pla inclinat
+    const plaInclinat = Bodies.polygon(width * 0.75, height * 0.8, 3, 180, {
+      isStatic: true,
+      angle: -Math.PI / 6,
+      friction: 0.5,
+      render: { fillStyle: "#6366f1" },
+      label: "Pla inclinat",
+    });
+
+    // Caixes de diferents masses
+    const caixes = [
+      Bodies.rectangle(130, height - 120, 70, 70, {
+        density: 0.005,
+        friction: 0.5,
+        restitution: 0.1,
+        render: { fillStyle: "#ef4444" },
+        label: "Caixa pesada (vermell)",
+      }),
+      Bodies.rectangle(240, height - 160, 60, 60, {
+        density: 0.003,
+        friction: 0.4,
+        restitution: 0.15,
+        render: { fillStyle: "#3b82f6" },
+        label: "Caixa mitjana (blau)",
+      }),
+      Bodies.rectangle(340, height - 200, 50, 50, {
+        density: 0.0015,
+        friction: 0.35,
+        restitution: 0.2,
+        render: { fillStyle: "#22c55e" },
+        label: "Caixa lleugera (verd)",
+      }),
+    ];
+
+    Composite.add(world, [floor, ceiling, leftWall, rightWall, fulcre, palanca, suport, plaInclinat, ...caixes]);
+
+    // Control amb ratolí
+    const mouse = Mouse.create(render.canvas);
+    const mouseConstraint = MouseConstraint.create(engine, {
+      mouse,
+      constraint: {
+        stiffness: 0.2,
+        render: { visible: false },
+      },
+    });
+    Composite.add(world, mouseConstraint);
+    render.mouse = mouse;
+
+    // HUD dinàmic
+    const hudContent = document.getElementById("hud-content");
+    let cosSeleccionat = null;
+
+    Events.on(mouseConstraint, "startdrag", (event) => {
+      cosSeleccionat = event.body;
+    });
+
+    Events.on(mouseConstraint, "enddrag", () => {
+      cosSeleccionat = null;
+      hudContent.textContent = "Arrossega un objecte per veure la seva massa i velocitat.";
+    });
+
+    const formatNumero = (valor) => Number.parseFloat(valor).toFixed(2);
+
+    const actualitzaHUD = () => {
+      if (cosSeleccionat) {
+        const massa = cosSeleccionat.mass;
+        const velocitat = Vector.magnitude(cosSeleccionat.velocity);
+        hudContent.innerHTML = `
+          <strong>Objecte:</strong> ${cosSeleccionat.label}<br>
+          <strong>Massa:</strong> ${formatNumero(massa)} kg<br>
+          <strong>Velocitat:</strong> ${formatNumero(velocitat)} m/s
+        `;
+      }
+      requestAnimationFrame(actualitzaHUD);
+    };
+
+    actualitzaHUD();
+
+    // Gestió de redimensionament (manté els límits visibles)
+    window.addEventListener("resize", () => {
+      const newWidth = window.innerWidth;
+      const newHeight = window.innerHeight;
+      Render.lookAt(render, {
+        min: { x: 0, y: 0 },
+        max: { x: newWidth, y: newHeight },
+      });
+    });
+  </script>
+</body>
+</html>
